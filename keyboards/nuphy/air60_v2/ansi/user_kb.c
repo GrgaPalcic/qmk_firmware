@@ -35,15 +35,18 @@ bool game_mode_enable    = 0;
 bool f_send_channel      = 0;
 bool f_dial_sw_init_ok   = 0;
 bool f_bat_num_show      = 0;
+bool rgb_power_save      = 0;
 
 uint8_t        rgb_required            = 0;
 uint8_t        rf_blink_cnt            = 0;
 uint8_t        rf_sw_temp              = 0;
 uint8_t        host_mode               = 0;
+uint8_t        low_bat_level           = 20;
 uint16_t       rf_linking_time         = 0;
 uint16_t       rf_link_show_time       = 0;
 uint32_t       no_act_time             = 0;
 uint16_t       f_rf_sw_press           = 0;
+uint16_t       f_rf_dfu_press          = 0;
 uint16_t       f_rgb_test_press        = 0;
 uint16_t       f_dev_reset_press       = 0;
 uint16_t       f_caps_word_tg          = 0;
@@ -107,7 +110,7 @@ void set_link_mode(void) {
 void custom_key_press(void) {
     static uint32_t long_press_timer = 0;
 
-    if (timer_elapsed32(long_press_timer) < 100) { return; }
+    if (timer_elapsed32(long_press_timer) < 10) { return; }
     long_press_timer = timer_read32();
 
     dial_sw_scan();
@@ -190,6 +193,9 @@ void custom_key_press(void) {
         }
     }
 
+    if (left_pressed)  { left_pressed++; }
+    if (right_pressed) { right_pressed++; }
+
     if (f_caps_word_tg) {
         f_caps_word_tg++;
         if (f_caps_word_tg > SMALL_PRESS_DELAY) {
@@ -199,6 +205,18 @@ void custom_key_press(void) {
             dprintf("caps_word_state: %s\n", user_config.caps_word_enable ? "ON" : "OFF");
 #endif
             signal_rgb_led(user_config.caps_word_enable, 1, led_idx.KC_CAPS, UINT8_MAX, CAPS_WORD_IDLE_TIMEOUT);
+        }
+    }
+
+    if (f_rf_dfu_press) {
+        f_rf_dfu_press++;
+        if (f_rf_dfu_press > MEDIUM_PRESS_DELAY && dev_info.link_mode == LINK_USB) {
+            f_rf_dfu_press = 0;
+#ifndef NO_DEBUG
+            dprintf("RF DFU Mode Enabled\n");
+#endif
+            uart_send_cmd(CMD_RF_DFU, 10, 20);
+            signal_rgb_led(9, 0, led_idx.RF_DFU, UINT8_MAX, UINT16_MAX);
         }
     }
 
@@ -395,7 +413,29 @@ void timer_pro(void) {
  */
 void load_eeprom_data(void) {
     eeconfig_read_kb_datablock(&user_config);
-    if (user_config.init_layer < 100) { user_config_reset(); }
+    if (user_config.init_layer < 100) {
+        user_config_reset();
+        return;
+    }
+
+    if (user_config.ee_side_mode > 4) { user_config.ee_side_mode = 0; }
+    if (user_config.ee_side_light > SIDE_BRIGHT_MAX) { user_config.ee_side_light = 1; }
+    if (user_config.ee_side_speed > SIDE_SPEED_MAX) { user_config.ee_side_speed = 2; }
+    if (user_config.ee_side_colour >= SIDE_COLOUR_MAX) { user_config.ee_side_colour = 0; }
+    if (user_config.ee_side_one > 1) { user_config.ee_side_one = 0; }
+    if (user_config.sleep_mode > 2) { user_config.sleep_mode = 1; }
+    if (user_config.caps_word_enable > 1) { user_config.caps_word_enable = 1; }
+    if (user_config.numlock_state > 2) { user_config.numlock_state = 1; }
+    if (user_config.debounce_ms == 0) { user_config.debounce_ms = DEBOUNCE; }
+    if (user_config.debounce_type > 2) { user_config.debounce_type = 1; }
+    if (user_config.light_sleep == 0) { user_config.light_sleep = 2; }
+    if (user_config.alt_light_sleep == 0) { user_config.alt_light_sleep = 6; }
+    if (user_config.game_side_colour >= SIDE_COLOUR_MAX) { user_config.game_side_colour = SIDE_MATRIX_GAME_MODE; }
+    if (user_config.game_side_light > SIDE_BRIGHT_MAX) { user_config.game_side_light = 2; }
+    if (user_config.game_debounce_ms == 0) { user_config.game_debounce_ms = DEBOUNCE; }
+    if (user_config.game_debounce_type > 2) { user_config.game_debounce_type = 1; }
+    if (user_config.socd_mode > 3) { user_config.socd_mode = 0; }
+    if (user_config.rf_delay_step > 4) { user_config.rf_delay_step = 2; }
 }
 
 void call_update_eeprom_data(bool* eeprom_update_init) {
@@ -608,6 +648,7 @@ void user_config_reset(void) {
     user_config.caps_word_enable        = 1;
     user_config.numlock_state           = 1;
     user_config.socd_mode               = 0;
+    user_config.rf_delay_step           = 2;
     keymap_config.no_gui                = 0;
     game_config_reset(0);
     user_config_override();
@@ -626,6 +667,28 @@ void game_config_reset(uint8_t save_to_eeprom) {
     user_config.game_debounce_type     = 1;
     game_config_override();
     if (save_to_eeprom) { eeconfig_update_kb_datablock(&user_config); }
+}
+
+void power_save(void) {
+    static uint32_t power_check_timer = 0;
+
+    if (timer_elapsed32(power_check_timer) < 5000) { return; }
+    power_check_timer = timer_read32();
+
+    if (dev_info.rf_battery > low_bat_level && rgb_power_save) {
+        if (game_mode_enable) {
+            rgb_matrix_config.hsv.v = user_config.game_rgb_val;
+            user_config.ee_side_light = user_config.game_side_light;
+        } else {
+            rgb_matrix_reload_from_eeprom();
+            eeconfig_read_kb_datablock(&user_config);
+        }
+        rgb_power_save = 0;
+    } else if ((rgb_matrix_config.hsv.v > 0 || user_config.ee_side_light > 1) && dev_info.rf_battery < low_bat_level) {
+        rgb_matrix_config.hsv.v = 0;
+        user_config.ee_side_light = 1;
+        rgb_power_save = 1;
+    }
 }
 
 /**

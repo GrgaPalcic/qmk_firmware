@@ -1,6 +1,8 @@
 # Customizations & Fixes
 
-The following customizations were applied on top of the stock firmware. 
+The following customizations were applied on top of the stock firmware.
+
+This Air60 V2 ANSI port is based on the quality-of-life firmware work originally implemented by `adi4086` for `air75_v2/ansi`. The Air60 port adapts that behavior while preserving Air60-specific hardware, layout, and VIA constraints.
 
 -  Fn + M + O Changes the side light to display on either left side or right side or alternating sides every 1 minute.
 
@@ -54,11 +56,11 @@ The following customizations were applied on top of the stock firmware.
    This is achieved through a buffer of 64 key actions (key down and key up are 2 actions). The buffer is cleared if connection is not established within 1s after the last action. <br />
    Key events after the buffer is full will also be dropped. (Buffer algorithm taken from jincao1) <br />
 
--  FN + M + F1 => enables Debug mode. This mode will show messages in console including matrix scan rate and various settings changes
+-  FN + M + 1 => enables Debug mode. This mode will show messages in console including matrix scan rate and various settings changes
 
 -  FN + M + ESC => will reboot keyboard. If you do not unpress the ESC key, it will enter bootmode so you can load new firmware.
 
--  FN + M + F2 => Will enter DFU mode so you can upload new RF firmware. The key will remain lit up as red until you reboot the keyboard. This mode is activated only when keyboard is connected to laptop/computer via USB
+-  FN + M + F2 => Long press enters RF DFU mode while linked over USB so you can upload new RF firmware. Short press cycles the wake delay used before RF reports are sent after the keyboard wakes up. 80ms is usually best for RF 1.x dongles and 480ms is usually best for RF 2.x dongles.
 
 -  All QMK animations are now included in this firmware
 
@@ -133,7 +135,7 @@ Example: <br />
    So you can setup up different settings based on sleep mode. The adjustment is similar to the example for debounce explained above. <br />
 
 -  Version will be shown when Debug is enabled like (example): <br />
-    Keyboard: nuphy/air75_v2/ansi @ QMK 0.25.10-62-g2a4e8d | BUILD: 2024-07-09-09:31:29 (1e4798ae3e) <br />
+    Keyboard: nuphy/air60_v2/ansi @ QMK 0.25.10-62-g2a4e8d | BUILD: 2024-07-09-09:31:29 (1e4798ae3e) <br />
 
 - Keyboard had 3 sleep settings selectable via FN + ]. <br />
   1. Side led green. Behaviour: <br />
@@ -157,4 +159,5 @@ Example: <br />
  <br />
 ## Author
 
-[@adi4086](https://github.com/adi4086)
+- Original Air75 V2 QoL implementation: [@adi4086](https://github.com/adi4086)
+- Air60 V2 ANSI port in this tree: adapts that work to the Air60-specific hardware target and custom VIA workflow

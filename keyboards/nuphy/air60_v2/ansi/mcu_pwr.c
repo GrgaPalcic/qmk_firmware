@@ -80,14 +80,14 @@ void SYSCFG_EXTILineConfig(uint8_t EXTI_PortSourceGPIOx, uint8_t EXTI_PinSourcex
  * @note This is Nuphy's "open sourced" sleep logic. It's not deep sleep.
  */
 void enter_light_sleep(void) {
-    uart_send_cmd(CMD_SET_CONFIG, 5, 5);
     if ((dev_info.link_mode == LINK_RF_24 && f_rf_sleep) || dev_info.rf_state != RF_CONNECT) {
         uart_send_cmd(CMD_SLEEP, 5, 5);
+    } else {
+        uart_send_cmd(CMD_SET_CONFIG, 5, 5);
     }
 
     led_pwr_sleep_handle();
     break_all_key();
-    // clear_report_buffer_and_queue();
 }
 
 /**
@@ -248,6 +248,9 @@ void exit_deep_sleep(void) {
     dev_info.rf_state = RF_LINKING;
     rf_disconnect_delay = UINT8_MAX;
     rf_linking_time     = 0;
+
+    void clear_report_buffer_and_queue(void);
+    clear_report_buffer_and_queue();
 
     // wait_us(1);
 #endif

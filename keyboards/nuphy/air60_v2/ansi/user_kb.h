@@ -101,7 +101,7 @@ typedef enum {
 #define HOST_BLE_TYPE             1
 #define HOST_RF_TYPE              2
 
-#define RF_POWER_DOWN_DELAY       (30)
+#define RF_POWER_DOWN_DELAY       ((user_config.rf_delay_step * 200) + 80)
 
 #define MICRO_PRESS_DELAY         5
 #define SMALL_PRESS_DELAY         10
@@ -113,7 +113,7 @@ typedef enum {
 
 #define RGB_MATRIX_GAME_MODE      RGB_MATRIX_GRADIENT_LEFT_RIGHT
 #define SIDE_MATRIX_GAME_MODE     4
-#define SOCD_KEYS                 KC_A, KC_D, KC_LEFT, KC_RIGHT
+#define SOCD_KEYS                 KC_A, KC_D, KC_LEFT, KC_RIGHT, KC_W, KC_S, KC_UP, KC_DOWN
 
 /*
 #define    CAPS_LED               28
@@ -183,6 +183,8 @@ typedef struct
     uint8_t retain2;
 } user_config_t;
 
+#define rf_delay_step retain1
+
 _Static_assert(sizeof(user_config_t) == EECONFIG_KB_DATA_SIZE, "Mismatch in user EECONFIG stored data");
 
 
@@ -209,15 +211,18 @@ extern uint8_t            rf_disconnect_delay;
 
 extern bool               f_bat_hold;
 extern bool               game_mode_enable;
+extern bool               rgb_power_save;
 extern uint32_t           sys_show_timer;
 extern uint32_t           sleep_show_timer;
 extern uint16_t           f_rf_sw_press;
+extern uint16_t           f_rf_dfu_press;
 extern uint16_t           f_dev_reset_press;
 extern bool               f_bat_num_show;
 extern uint16_t           f_rgb_test_press;
 extern uint16_t           f_caps_word_tg;
 extern uint16_t           f_numlock_press;
 extern uint16_t           f_gmode_reset_press;
+extern uint8_t            low_bat_level;
 
 extern uint8_t            rf_sw_temp;
 extern uint16_t           rf_sw_press_delay;
@@ -259,6 +264,7 @@ void    side_colour_control(uint8_t dir);
 void    side_mode_control(uint8_t dir);
 void    side_one_control(uint8_t dir);
 void    led_show(void);
+void    rgb_matrix_update_pwm_buffers(void);
 void    sleep_handle(void);
 void    bat_num_led(void);
 void    rgb_test_show(void);
@@ -272,6 +278,7 @@ void    timer_pro(void);
 void    load_eeprom_data(void);
 void    delay_update_eeprom_data(void);
 void    user_config_reset(void);
+void    power_save(void);
 void    led_power_handle(void);
 void    set_link_mode(void);
 void    matrix_io_delay(void);

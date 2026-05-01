@@ -81,6 +81,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case DEBOUNCE_D:
         case DEBOUNCE_T:
         case SOCD_TOG:
+        case RF_DFU:
             call_update_eeprom_data(&user_update);
             return true;
 
@@ -152,10 +153,16 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
     switch (keycode) {
         case RF_DFU:
+            if (game_mode_enable) { return false; }
             if (record->event.pressed) {
-                if (dev_info.link_mode != LINK_USB) { return false; }
-                uart_send_cmd(CMD_RF_DFU, 10, 20);
-                signal_rgb_led(0, 1, led_idx.RF_DFU, UINT8_MAX, UINT16_MAX);
+                f_rf_dfu_press = 1;
+            } else if (f_rf_dfu_press) {
+                f_rf_dfu_press = 0;
+                user_config.rf_delay_step = (user_config.rf_delay_step + 1) % 5;
+#ifndef NO_DEBUG
+                dprintf("rf_delay: %d\n", RF_POWER_DOWN_DELAY);
+#endif
+                signal_rgb_led(user_config.rf_delay_step * 2, 0, led_idx.RF_DFU, UINT8_MAX, 3000);
             }
             return false;
 
@@ -180,6 +187,10 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     set_link_mode();
                     uart_send_cmd(CMD_SET_LINK, 10, 20);
                 }
+                for (uint8_t i = 1; i <= 4; i++) {
+                    rgb_matrix_set_color(i, RGB_OFF);
+                }
+                rgb_matrix_update_pwm_buffers();
             }
             return false;
 
@@ -230,8 +241,10 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
         case MAC_DND:
             if (record->event.pressed) {
-                host_system_send(0x9b);
-            } else {
+                if (dev_info.sys_sw_state == SYS_SW_MAC) {
+                    host_system_send(0x9b);
+                }
+            } else if (dev_info.sys_sw_state == SYS_SW_MAC) {
                 host_system_send(0);
             }
             return false;
@@ -441,6 +454,12 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
         case BAT_NUM:
             f_bat_num_show = record->event.pressed;
+            if (!record->event.pressed) {
+                for (uint8_t i = 1; i <= 10; i++) {
+                    rgb_matrix_set_color(i, RGB_OFF);
+                }
+                rgb_matrix_update_pwm_buffers();
+            }
             return false;
 
         case RGB_TEST:
@@ -475,10 +494,10 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 wait_ms(100);
             } else {
                 if (user_config.sleep_mode == 0) { return true; }
-                else {
-                    f_goto_sleep = 1;
-                    f_goto_deepsleep  = 1;
-                }
+                f_goto_sleep = 1;
+                f_goto_deepsleep = 1;
+                no_act_time = 100;
+                break_all_key();
             }
             return false;
 
@@ -545,9 +564,11 @@ bool rgb_matrix_indicators_kb(void) {
         return false;
     }
 
-    if(f_bat_num_show) {
+    if (f_bat_num_show) {
         bat_num_led();
     }
+
+    power_save();
 
     // power down unused LEDs
     led_power_handle();

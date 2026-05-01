@@ -109,9 +109,9 @@
 	"qmk_lighting"
 ],
 "customKeycodes": [
- 		{
+		{
 			"name": "RF\nDFU",
-			"title": "RF DFU",
+			"title": "RF DFU on USB | Wake Delay",
 			"shortName": "RF_DFU"
 		},
 		{

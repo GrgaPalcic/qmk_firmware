@@ -503,8 +503,12 @@ void rf_led_show(void) {
     // light up corresponding BT/RF key
     if (dev_info.link_mode <= LINK_BT_3) {
         uint8_t my_pos = dev_info.link_mode == LINK_RF_24 ? 4 : dev_info.link_mode;
-        rgb_required = 1;
-        rgb_matrix_set_color(led_idx.KC_TAB + my_pos, current_rgb.r, current_rgb.g, current_rgb.b);
+        if (rf_link_show_time > RF_LINK_SHOW_TIME - 10) {
+            rgb_matrix_set_color(my_pos, RGB_OFF);
+        } else {
+            rgb_required = 1;
+            rgb_matrix_set_color(my_pos, current_rgb.r, current_rgb.g, current_rgb.b);
+        }
     }
 }
 
@@ -519,7 +523,7 @@ void bat_num_led(void) {
     rgb_required = 1;
 
     // set color
-    if (bat_percent <= 15) {
+    if (bat_percent < low_bat_level) {
         r = 0xff; g = 0x00; b = 0x00;
     }
     else if (bat_percent <= 50) {
@@ -625,7 +629,7 @@ void bat_led_show(void)
         }
     }
 
-    if (dev_info.rf_battery < 15) {
+    if (dev_info.rf_battery < low_bat_level) {
         bat_show_flag = true;
         bat_show_breath = true;
         bat_show_time = timer_read32();
@@ -639,7 +643,7 @@ void bat_led_show(void)
                 bat_play_timer = timer_read32();
                 light_point_playing(0, 1, BREATHE_TAB_LEN, &bat_play_point);
             }
-            current_rgb.r = SIDE_BLINK_LIGHT, current_rgb.g = dev_info.rf_battery < 15 ? 0x00 : SIDE_BLINK_LIGHT / 2, current_rgb.b = 0x00;
+            current_rgb.r = SIDE_BLINK_LIGHT, current_rgb.g = dev_info.rf_battery < low_bat_level ? 0x00 : SIDE_BLINK_LIGHT / 2, current_rgb.b = 0x00;
             count_rgb_light(breathe_data_tab[bat_play_point]);
             set_side_rgb(RIGHT_SIDE + SYS_MARK, current_rgb.r, current_rgb.g, current_rgb.b);
         } else {
@@ -789,7 +793,7 @@ void normal_led_process(void) {
         side_one_show();
         bat_led_show();
         sleep_sw_led_show();
-    } else if (dev_info.rf_battery < 15 && !USB_ACTIVE) { set_side_rgb(RIGHT_SIDE, 0x40, 0x00, 0x00); }
+    } else if (dev_info.rf_battery < low_bat_level && !USB_ACTIVE) { set_side_rgb(RIGHT_SIDE, 0x40, 0x00, 0x00); }
 
     sys_sw_led_show();
     sys_led_show();
