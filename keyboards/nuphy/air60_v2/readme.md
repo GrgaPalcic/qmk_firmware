@@ -36,19 +36,6 @@ nuphy_air60_v2_ansi_via.bin
 - `FN + M + 1` toggles debug because `DB_TOGG` is on the `1` key in `M_LAYER`.
 - Run `qmk console` after enabling debug to see matrix scan rate and settings logs.
 
-## Commit Reference
-
-Suggested branch and commit flow:
-
-```bash
-git checkout -b grgas-air60v2
-git add keyboards/nuphy/air60_v2
-git commit -m "Port adi4086's Air75 V2 QoL firmware to Air60 V2 ANSI" \
-  -m "Preserve the Air60 V2 hardware layout, matrix, RGB driver, and custom VIA contract while porting the newer Air75 V2 quality-of-life behavior." \
-  -m "This includes RF wake-delay handling, USB-only RF DFU hold behavior, wake buffering, sleep and LED power fixes, and updated Air60 documentation for build, flash, console, and debug workflows." \
-  -m "Credit: original Air75 V2 QoL implementation by adi4086; this Air60 V2 work adapts those changes to the Air60 ANSI target."
-```
-
 ## Credit
 
 The original Air75 V2 QoL implementation was done by [adi4086](https://github.com/adi4086). This Air60 V2 port adapts that work to the Air60 ANSI hardware target while preserving Air60-specific constraints.
