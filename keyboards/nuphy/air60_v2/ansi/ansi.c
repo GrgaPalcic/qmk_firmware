@@ -22,6 +22,164 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 char            socd_type[4][14]  = { "disabled", "cancellation", "exclusion", "nullification" };
 
+typedef enum {
+    SOCD_SIDE_NONE = 0,
+    SOCD_SIDE_LEFT,
+    SOCD_SIDE_RIGHT,
+} socd_side_t;
+
+typedef struct {
+    uint16_t left;
+    uint16_t right;
+} socd_pair_t;
+
+typedef struct {
+    bool        physical_left;
+    bool        physical_right;
+    bool        logical_left;
+    bool        logical_right;
+    socd_side_t last_pressed;
+    socd_side_t blocked_side;
+} socd_state_t;
+
+static const socd_pair_t socd_pairs[] = {
+    { KC_A, KC_D },
+    { KC_LEFT, KC_RIGHT },
+    { KC_W, KC_S },
+    { KC_UP, KC_DOWN },
+};
+
+static socd_state_t socd_states[sizeof_array(socd_pairs)] = {0};
+
+static socd_side_t socd_opposite_side(socd_side_t side) {
+    if (side == SOCD_SIDE_LEFT) { return SOCD_SIDE_RIGHT; }
+    if (side == SOCD_SIDE_RIGHT) { return SOCD_SIDE_LEFT; }
+    return SOCD_SIDE_NONE;
+}
+
+static bool socd_find_pair(uint16_t keycode, uint8_t *pair_idx, socd_side_t *side) {
+    for (uint8_t idx = 0; idx < sizeof_array(socd_pairs); ++idx) {
+        if (keycode == socd_pairs[idx].left) {
+            *pair_idx = idx;
+            *side     = SOCD_SIDE_LEFT;
+            return true;
+        }
+
+        if (keycode == socd_pairs[idx].right) {
+            *pair_idx = idx;
+            *side     = SOCD_SIDE_RIGHT;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static socd_side_t socd_current_winner(const socd_state_t *state) {
+    if (state->last_pressed == SOCD_SIDE_LEFT || state->last_pressed == SOCD_SIDE_RIGHT) {
+        return state->last_pressed;
+    }
+
+    if (state->logical_left) { return SOCD_SIDE_LEFT; }
+    if (state->logical_right) { return SOCD_SIDE_RIGHT; }
+
+    return SOCD_SIDE_LEFT;
+}
+
+static void socd_apply_output(uint8_t pair_idx, bool want_left, bool want_right) {
+    socd_state_t       *state = &socd_states[pair_idx];
+    const socd_pair_t  *pair  = &socd_pairs[pair_idx];
+
+    if (state->logical_left && !want_left) {
+        unregister_code16(pair->left);
+    }
+
+    if (state->logical_right && !want_right) {
+        unregister_code16(pair->right);
+    }
+
+    if (!state->logical_left && want_left) {
+        register_code16(pair->left);
+    }
+
+    if (!state->logical_right && want_right) {
+        register_code16(pair->right);
+    }
+
+    state->logical_left  = want_left;
+    state->logical_right = want_right;
+}
+
+static void socd_update_pair(uint8_t pair_idx) {
+    socd_state_t *state      = &socd_states[pair_idx];
+    bool          want_left  = false;
+    bool          want_right = false;
+
+    if (!state->physical_left && !state->physical_right) {
+        state->last_pressed = SOCD_SIDE_NONE;
+        state->blocked_side = SOCD_SIDE_NONE;
+        socd_apply_output(pair_idx, false, false);
+        return;
+    }
+
+    switch (user_config.socd_mode) {
+        case 1: {
+            if (state->blocked_side == SOCD_SIDE_LEFT && !state->physical_left) {
+                state->blocked_side = SOCD_SIDE_NONE;
+            } else if (state->blocked_side == SOCD_SIDE_RIGHT && !state->physical_right) {
+                state->blocked_side = SOCD_SIDE_NONE;
+            }
+
+            if (state->physical_left && state->physical_right) {
+                socd_side_t winner = socd_current_winner(state);
+                state->blocked_side = socd_opposite_side(winner);
+                want_left  = winner == SOCD_SIDE_LEFT;
+                want_right = winner == SOCD_SIDE_RIGHT;
+            } else if (state->physical_left) {
+                want_left = state->blocked_side != SOCD_SIDE_LEFT;
+            } else {
+                want_right = state->blocked_side != SOCD_SIDE_RIGHT;
+            }
+            break;
+        }
+
+        case 2: {
+            state->blocked_side = SOCD_SIDE_NONE;
+            if (state->physical_left && state->physical_right) {
+                socd_side_t winner = socd_current_winner(state);
+                want_left  = winner == SOCD_SIDE_LEFT;
+                want_right = winner == SOCD_SIDE_RIGHT;
+            } else {
+                want_left  = state->physical_left;
+                want_right = state->physical_right;
+            }
+            break;
+        }
+
+        case 3: {
+            state->blocked_side = SOCD_SIDE_NONE;
+            if (state->physical_left != state->physical_right) {
+                want_left  = state->physical_left;
+                want_right = state->physical_right;
+            }
+            break;
+        }
+
+        default: {
+            state->blocked_side = SOCD_SIDE_NONE;
+            want_left  = state->physical_left;
+            want_right = state->physical_right;
+            break;
+        }
+    }
+
+    socd_apply_output(pair_idx, want_left, want_right);
+}
+
+void socd_reset_state(void) {
+    memset(socd_states, 0, sizeof(socd_states));
+}
+
 /* qmk pre-process record */
 bool pre_process_record_kb(uint16_t keycode, keyrecord_t *record) {
     no_act_time      = 0;
@@ -43,31 +201,34 @@ bool pre_process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
 bool process_record_socd(uint16_t keycode, keyrecord_t *record) {
     if (user_config.socd_mode == 0) { return true; }
-    uint8_t socd_array[] = { SOCD_KEYS };
-    for (uint8_t idx = 0; idx < sizeof_array(socd_array); ++idx) {
-        if ( keycode != socd_array[idx] ) { continue; }
 
-        if (idx % 2 == 0) {
-            left_pressed = record->event.pressed;
-            idx++;
-        } else {
-            right_pressed = record->event.pressed;
-            idx--;
-        }
+    uint8_t     pair_idx = 0;
+    socd_side_t side     = SOCD_SIDE_NONE;
 
-        if (record->event.pressed) {
-            if (right_pressed + left_pressed > 2) {
-                unregister_code(socd_array[idx]);
-                if (user_config.socd_mode == 3) { return false; }
-            }
-        } else {
-            if (right_pressed + left_pressed > 2) {
-                if (user_config.socd_mode >= 2) { register_code(socd_array[idx]); }
-            }
-        }
+    if (!socd_find_pair(keycode, &pair_idx, &side)) {
         return true;
     }
-    return true;
+
+    socd_state_t *state = &socd_states[pair_idx];
+
+    if (side == SOCD_SIDE_LEFT) {
+        state->physical_left = record->event.pressed;
+    } else {
+        state->physical_right = record->event.pressed;
+    }
+
+    if (record->event.pressed) {
+        state->last_pressed = side;
+    }
+
+    socd_update_pair(pair_idx);
+
+    if (!state->physical_left && !state->physical_right) {
+        state->last_pressed = SOCD_SIDE_NONE;
+        state->blocked_side = SOCD_SIDE_NONE;
+    }
+
+    return false;
 }
 
 /* qmk process record user*/
@@ -532,6 +693,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
         case SOCD_TOG:
             if (record->event.pressed) {
+                break_all_key();
                 user_config.socd_mode = (user_config.socd_mode + 1) % 4;
 #ifndef NO_DEBUG
                 dprintf("SOCD:    %s(%d)\n", socd_type[user_config.socd_mode], user_config.socd_mode);

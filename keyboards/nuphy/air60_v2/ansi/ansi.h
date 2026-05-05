@@ -63,3 +63,5 @@ enum custom_keycodes {
 
     SOCD_TOG
 };
+
+void socd_reset_state(void);

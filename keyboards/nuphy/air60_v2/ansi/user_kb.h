@@ -244,8 +244,6 @@ extern uint32_t           dequeue_delay;
 extern bool               rgb_update;
 extern bool               user_update;
 extern uint8_t            rgb_required;
-extern uint16_t           left_pressed;
-extern uint16_t           right_pressed;
 
 extern bool               is_side_rgb_off(void);
 extern void               user_config_override(void);

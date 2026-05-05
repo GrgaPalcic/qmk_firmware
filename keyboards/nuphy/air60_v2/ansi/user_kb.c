@@ -61,9 +61,6 @@ uint16_t       gmode_reset_press_delay = 0;
 uint32_t       sys_show_timer          = 0;
 uint32_t       sleep_show_timer        = 0;
 
-uint16_t       left_pressed            = 0;
-uint16_t       right_pressed           = 0;
-
 host_driver_t *m_host_driver           = 0;
 
 uint16_t       link_timeout            = T_MIN;
@@ -193,9 +190,6 @@ void custom_key_press(void) {
         }
     }
 
-    if (left_pressed)  { left_pressed++; }
-    if (right_pressed) { right_pressed++; }
-
     if (f_caps_word_tg) {
         f_caps_word_tg++;
         if (f_caps_word_tg > SMALL_PRESS_DELAY) {
@@ -227,6 +221,7 @@ void custom_key_press(void) {
  */
 void break_all_key(void) {
     clear_keyboard();
+    socd_reset_state();
     void clear_report_buffer_and_queue(void);
     clear_report_buffer_and_queue();
 }
